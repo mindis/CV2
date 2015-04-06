@@ -111,7 +111,7 @@ def homography_ransac(matches, n, kp1, kp2, verbose=False):
         pa = []
         pb = []
         for _ in range(4):
-            random_idx = randint(0, len(p1)-1)
+            random_idx = randint(0, len(p1) - 1)
             pa.append(p1[random_idx])
             pb.append(p2[random_idx])
 
@@ -137,6 +137,57 @@ def homography_ransac(matches, n, kp1, kp2, verbose=False):
             print i, best_counter, len(matches)
 
     return best_matrix
+
+
+def findDimensions(image, homography):
+    base_p1 = np.ones(3, np.float32)
+    base_p2 = np.ones(3, np.float32)
+    base_p3 = np.ones(3, np.float32)
+    base_p4 = np.ones(3, np.float32)
+
+    (y, x) = image.shape[:2]
+
+    base_p1[:2] = [0, 0]
+    base_p2[:2] = [x, 0]
+    base_p3[:2] = [0, y]
+    base_p4[:2] = [x, y]
+
+    max_x = None
+    max_y = None
+    min_x = None
+    min_y = None
+
+    for pt in [base_p1, base_p2, base_p3, base_p4]:
+
+        hp = np.matrix(homography, np.float32) * np.matrix(pt, np.float32).T
+
+        hp_arr = np.array(hp, np.float32)
+
+        normal_pt = np.array([hp_arr[0] / hp_arr[2], hp_arr[1] / hp_arr[2]], np.float32)
+
+        if max_x is None or normal_pt[0, 0] > max_x:
+            max_x = normal_pt[0, 0]
+
+        if max_y is None or normal_pt[1, 0] > max_y:
+            max_y = normal_pt[1, 0]
+
+        if min_x is None or normal_pt[0, 0] < min_x:
+            min_x = normal_pt[0, 0]
+
+        if min_y is None or normal_pt[1, 0] < min_y:
+            min_y = normal_pt[1, 0]
+
+    min_x = min(0, min_x)
+    min_y = min(0, min_y)
+
+    return min_x, min_y, max_x, max_y
+
+
+def stiching(base, new_img, H):
+    H = H / H[2, 2]
+    H_inv = np.linalg.inv(H)
+    print findDimensions(new_img, H_inv)
+    pass
 
 
 img1 = cv2.imread(sys.argv[1])  # queryImage
@@ -176,5 +227,13 @@ print "\t Filtered Match Count: ", len(matches)
 
 H = homography_ransac(matches, 100, kp1, kp2, verbose=True)
 
-plt.imshow(cv2.warpPerspective(img1, H, img1.shape[:2])[:, :, ::-1])
+plt.subplot(131)
+plt.imshow(img1[:, :, ::-1])
+plt.subplot(132)
+plt.imshow(cv2.warpPerspective(img1, H, (img1.shape[1], img1.shape[0]))[:, :, ::-1])
+plt.subplot(133)
+plt.imshow(img2[:, :, ::-1])
 plt.show()
+
+stiching(img1, img2, H)
+
