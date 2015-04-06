@@ -85,9 +85,9 @@ def find_coeffs(pa, pb):
     A = np.matrix(matrix)
     B = np.array(pb).reshape(8)
 
-    H = np.array((np.linalg.inv(A.T * A) * A.T).dot(B))
-    H = H.reshape(8)
-    H = np.append(H,1).reshape((3,3))
+    H = np.dot(np.linalg.pinv(A), B)
+    H = np.array(H).reshape(8)
+    H = np.concatenate((H,np.array([1]))).reshape((3,3))
     return H
 
 def homography_ransac(matches, n, kp1, kp2, verbose=False):
@@ -169,9 +169,6 @@ def stitch(new_img, base_img, H):
     plt.imshow(warped_img)
     plt.show()
 
-
-
-
 print
 print 'Stitching',sys.argv[1],'and', sys.argv[2]
 print '='*80
@@ -203,3 +200,4 @@ print "Filtered Match Count:\t", len(matches)
 H = homography_ransac(matches, 50, kp1, kp2, verbose=True)
 
 stitch(img1, img2, H)
+
