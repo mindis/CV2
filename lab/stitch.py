@@ -86,7 +86,7 @@ def find_coeffs(pa, pb):
     A = np.matrix(matrix, dtype=np.float)
     B = np.array(pb).reshape(8)
 
-    res = np.dot(np.linalg.inv(A.T * A) * A.T, B)
+    res = np.dot(np.linalg.pinv(A), B)
     return np.array(res).reshape(8)
 
 
@@ -225,7 +225,7 @@ print "\t Filtered Match Count: ", len(matches)
 # Draw first 10 matches.
 # drawMatches(img1, kp1, img2, kp2, matches[:10])
 
-H = homography_ransac(matches, 100, kp1, kp2, verbose=True)
+H = homography_ransac(matches, 1000, kp1, kp2, verbose=True)
 
 plt.subplot(131)
 plt.imshow(img1[:, :, ::-1])
