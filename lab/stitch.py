@@ -1,10 +1,10 @@
-# from __future__ import division
+from __future__ import division
 import sys
 import numpy as np
 import cv2
 from scipy.spatial import distance
 from random import randint
-
+import math
 from matplotlib import pyplot as plt
 
 
@@ -76,105 +76,130 @@ def filter_matches(matches, ratio=0.75):
 
     return filtered_matches
 
-
 def find_coeffs(pa, pb):
     matrix = []
     for p1, p2 in zip(pa, pb):
         matrix.append([p1[0], p1[1], 1, 0, 0, 0, -p2[0] * p1[0], -p2[0] * p1[1]])
         matrix.append([0, 0, 0, p1[0], p1[1], 1, -p2[1] * p1[0], -p2[1] * p1[1]])
 
-    A = np.matrix(matrix, dtype=np.float)
+    A = np.matrix(matrix)
     B = np.array(pb).reshape(8)
 
-    res = np.dot(np.linalg.inv(A.T * A) * A.T, B)
-    return np.array(res).reshape(8)
-
+    H = np.array((np.linalg.inv(A.T * A) * A.T).dot(B))
+    H = H.reshape(8)
+    H = np.append(H,1).reshape((3,3))
+    return H
 
 def homography_ransac(matches, n, kp1, kp2, verbose=False):
-    THRESHOLD = 10
+    THRESHOLD = 3
 
-    best_matrix = None
-    best_counter = None
+    best_H   = None
+    best_inliers = None
     _kp1 = []
     _kp2 = []
 
     for match in matches:
-        _kp1.append(kp1[match.trainIdx])
-        _kp2.append(kp2[match.queryIdx])
+        _kp1.append(kp1[match.queryIdx])
+        _kp2.append(kp2[match.trainIdx])
 
-    p1 = np.array([k.pt for k in _kp1])
-    p2 = np.array([k.pt for k in _kp2])
+    points1 = np.array([k.pt for k in _kp1])
+    points2 = np.array([k.pt for k in _kp2])
 
     for i in range(n):
         # pick n random matches
-        counter = 0
-        pa = []
-        pb = []
+        inliers = 0
+        picked1 = []
+        picked2 = []
         for _ in range(4):
-            random_idx = randint(0, len(p1)-1)
-            pa.append(p1[random_idx])
-            pb.append(p2[random_idx])
+            random_idx = randint(0, len(points1)-1)
+            picked1.append(points1[random_idx])
+            picked2.append(points2[random_idx])
 
-        H = find_coeffs(pa, pb)
-        H_mat = np.append(H, 1).reshape((3, 3))
-
+        H = find_coeffs(picked1, picked2)
         # eval
-        for p in range(len(p1)):
+        for point in range(len(points1)):
 
             # transform all key-points of image 1
-            (x_, y_, w_) = np.dot(H_mat, [p1[p][0], p1[p][1], 1])
+            coords = np.append(points1[point], 1)
+            (x, y, w) = np.dot(H, coords)
 
             # count inliers
-            if distance.euclidean((x_ / w_, y_ / w_), (p2[p][0], p2[p][1])) <= THRESHOLD:
-                counter += 1
+            if distance.euclidean((x / w, y / w), points2[point]) <= THRESHOLD:
+                inliers += 1
 
-        # keep transformation matrix if it exceed the current best
-        if (best_counter is None) or (best_counter < counter):
-            best_counter = counter
-            best_matrix = H_mat
+        # keep transformation matrix if it exceeds the current best
+        if (best_inliers is None) or (best_inliers < inliers):
+            best_inliers = inliers
+            best_H = H
+        
+        print best_inliers
+    return best_H
 
-        if verbose and i % 100 == 0:
-            print i, best_counter, len(matches)
+def findDimensions(image, H):
+    h, w = image.shape[:2] #Height, width
+    base = [[0, 0, h, h], 
+            [0, w, 0, w], 
+            [1, 1, 1, 1]]
 
-    return best_matrix
+    base = np.array(base)
+    base_prime = H.dot(base)
+    new_coords = base_prime[:2] / base_prime[2]    
+    min_x = min(new_coords[0])
+    min_y = min(new_coords[1])
+    max_x = max(new_coords[0])
+    max_y = max(new_coords[1])
+
+    return min_x, max_x, min_y, max_y
+
+    
+
+def stitch(new_img, base_img, H):
+    min_x, max_x, min_y, max_y = findDimensions(new_img, H)
+
+    new_shape = (max_y - min_y if min_y < 0 else max_y,
+                 max_x - min_x if min_x < 0 else max_x)
+    new_shape = tuple(map(int,map(math.ceil,new_shape)))
+    
+    if min_x < 0:
+        H[0,2] -= min_x
+    if min_y < 0:
+        H[1,2] -= min_y
+
+    warped_img = cv2.warpPerspective(new_img, H, new_shape)
+    plt.imshow(warped_img)
+    plt.show()
 
 
-img1 = cv2.imread(sys.argv[1])  # queryImage
-img2 = cv2.imread(sys.argv[2])  # trainImage
+
+
+print
+print 'Stitching',sys.argv[1],'and', sys.argv[2]
+print '='*80
+
+img1 = cv2.imread(sys.argv[1])[:,:,::-1]
+img2 = cv2.imread(sys.argv[2])[:,:,::-1]
 
 # added blur to reduce noise
-img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY), (5, 5), 0)
-img2_ = cv2.GaussianBlur(cv2.cvtColor(img2, cv2.COLOR_BGR2GRAY), (5, 5), 0)
+img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY), (3, 3), 0)
+img2_ = cv2.GaussianBlur(cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY), (3, 3), 0)
 
 # Initiate SIFT detector
 sift = cv2.SIFT()
 
 # find the keypoints and descriptors with SIFT
-kp1, des1 = sift.detectAndCompute(img1, None)
-kp2, des2 = sift.detectAndCompute(img2, None)
+kp1, des1 = sift.detectAndCompute(img1_, None)
+kp2, des2 = sift.detectAndCompute(img2_, None)
 
-# create BFMatcher object => match
-# bf = cv2.BFMatcher()
-# matches = bf.match(des1, des2)
-
-# create nearest-neighbor matching (alternative)
 FLANN_INDEX_KDTREE = 1  # bug: flann enums are missing
-flann_params = dict(algorithm=FLANN_INDEX_KDTREE,
-                    trees=5)
+flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
 matcher = cv2.FlannBasedMatcher(flann_params, {})
-matches = matcher.knnMatch(des2, trainDescriptors=des1, k=2)
-print "\t Match Count: ", len(matches)
+
+matches = matcher.knnMatch(des1, trainDescriptors=des2, k=2)
+print "Match Count:\t\t", len(matches)
 
 matches = filter_matches(matches)
-print "\t Filtered Match Count: ", len(matches)
+print "Filtered Match Count:\t", len(matches)
 
-# Sort them in the order of their distance.
-# matches = sorted(matches, key=lambda x: x.distance)
+H = homography_ransac(matches, 50, kp1, kp2, verbose=True)
 
-# Draw first 10 matches.
-# drawMatches(img1, kp1, img2, kp2, matches[:10])
-
-H = homography_ransac(matches, 100, kp1, kp2, verbose=True)
-
-plt.imshow(cv2.warpPerspective(img1, H, img1.shape[:2])[:, :, ::-1])
-plt.show()
+stitch(img1, img2, H)
