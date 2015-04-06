@@ -76,6 +76,7 @@ def filter_matches(matches, ratio=0.75):
 
     return filtered_matches
 
+
 def find_coeffs(pa, pb):
     matrix = []
     for p1, p2 in zip(pa, pb):
@@ -87,13 +88,14 @@ def find_coeffs(pa, pb):
 
     H = np.dot(np.linalg.pinv(A), B)
     H = np.array(H).reshape(8)
-    H = np.concatenate((H,np.array([1]))).reshape((3,3))
+    H = np.concatenate((H, np.array([1]))).reshape((3, 3))
     return H
+
 
 def homography_ransac(matches, n, kp1, kp2, verbose=False):
     THRESHOLD = 3
 
-    best_H   = None
+    best_H = None
     best_inliers = None
     _kp1 = []
     _kp2 = []
@@ -111,7 +113,7 @@ def homography_ransac(matches, n, kp1, kp2, verbose=False):
         picked1 = []
         picked2 = []
         for _ in range(4):
-            random_idx = randint(0, len(points1)-1)
+            random_idx = randint(0, len(points1) - 1)
             picked1.append(points1[random_idx])
             picked2.append(points2[random_idx])
 
@@ -131,19 +133,19 @@ def homography_ransac(matches, n, kp1, kp2, verbose=False):
         if (best_inliers is None) or (best_inliers < inliers):
             best_inliers = inliers
             best_H = H
-        
-        print best_inliers
-    return best_H
+
+    return best_H, best_inliers
+
 
 def findDimensions(image, H):
-    h, w = image.shape[:2] #Height, width
-    base = [[0, 0, h, h], 
-            [0, w, 0, w], 
+    h, w = image.shape[:2]  # Height, width
+    base = [[0, 0, h, h],
+            [0, w, 0, w],
             [1, 1, 1, 1]]
 
     base = np.array(base)
     base_prime = H.dot(base)
-    new_coords = base_prime[:2] / base_prime[2]    
+    new_coords = base_prime[:2] / base_prime[2]
     min_x = min(new_coords[0])
     min_y = min(new_coords[1])
     max_x = max(new_coords[0])
@@ -151,30 +153,104 @@ def findDimensions(image, H):
 
     return min_x, max_x, min_y, max_y
 
-    
 
-def stitch(new_img, base_img, H):
-    min_x, max_x, min_y, max_y = findDimensions(new_img, H)
+def create_mask(img):
+    img2gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, mask = cv2.threshold(img2gray, 1, 255, cv2.THRESH_BINARY)
+    return cv2.bitwise_not(mask)
 
-    new_shape = (max_y - min_y if min_y < 0 else max_y,
-                 max_x - min_x if min_x < 0 else max_x)
-    new_shape = tuple(map(int,map(math.ceil,new_shape)))
-    
+
+def remove_black_edges(img):
+    # Crop off the black edges
+    final_gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    _, thresh = cv2.threshold(final_gray, 1, 255, cv2.THRESH_BINARY)
+    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_NONE)
+
+    max_area = 0
+    best_rect = (0, 0, 0, 0)
+
+    for cnt in contours:
+        x, y, w, h = cv2.boundingRect(cnt)
+
+        deltaHeight = h - y
+        deltaWidth = w - x
+
+        area = deltaHeight * deltaWidth
+
+        if area > max_area and deltaHeight > 0 and deltaWidth > 0:
+            max_area = area
+            best_rect = (x, y, w, h)
+
+    if max_area > 0:
+        img_crop = img[best_rect[1]:best_rect[1] + best_rect[3],
+                   best_rect[0]:best_rect[0] + best_rect[2]]
+
+        return img_crop
+
+    return img
+
+
+def stitch(new_img, base_img, H, BASE_ON_TOP=False):
+    """
+    Stitch 2 images together
+    :param new_img: image to stitch
+    :param base_img: base image
+    :param H: Homography coordinate
+    :param BASE_ON_TOP: Set to True for placing new image at the back
+    :return: stitched image
+    """
+    # do the invert because we want to transform new_image to the base_image
+    H_inv = np.linalg.pinv(H)
+
+    min_x, max_x, min_y, max_y = findDimensions(new_img, H_inv)
+
+    # Adjust max_x and max_y by base img size
+    max_x = max(max_x, base_img.shape[1])
+    max_y = max(max_y, base_img.shape[0])
+
+    # create translation transform matrix
+    move_h = np.matrix(np.identity(3), np.float32)
+
     if min_x < 0:
-        H[0,2] -= min_x
-    if min_y < 0:
-        H[1,2] -= min_y
+        move_h[0, 2] -= min_x
 
-    warped_img = cv2.warpPerspective(new_img, H, new_shape)
-    plt.imshow(warped_img)
-    plt.show()
+    if min_y < 0:
+        move_h[1, 2] -= min_y
+
+    mod_inv_h = move_h * H_inv
+
+    img_w = int(math.ceil(max_x))
+    img_h = int(math.ceil(max_y))
+
+    base_img_warp = cv2.warpPerspective(base_img, move_h, (img_w, img_h))
+    new_img_warp = cv2.warpPerspective(new_img, mod_inv_h, (img_w, img_h))
+
+    # create empty matrix
+    canvas = np.zeros((img_h, img_w, 3), np.uint8)
+
+    # combining
+    if BASE_ON_TOP:
+        bg = cv2.add(canvas, base_img_warp, dtype=cv2.CV_8U)
+        fg = cv2.add(canvas, new_img_warp, mask=create_mask(base_img_warp), dtype=cv2.CV_8U)
+    else:
+        bg = cv2.add(canvas, base_img_warp, mask=create_mask(new_img_warp), dtype=cv2.CV_8U)
+        fg = cv2.add(canvas, new_img_warp, dtype=cv2.CV_8U)
+
+    # Now add the warped image
+    canvas = cv2.add(bg, fg)
+
+    # remove black edges
+    canvas = remove_black_edges(canvas)
+
+    return canvas
+
 
 print
-print 'Stitching',sys.argv[1],'and', sys.argv[2]
-print '='*80
+print 'Stitching', sys.argv[1], 'and', sys.argv[2]
+print '=' * 80
 
-img1 = cv2.imread(sys.argv[1])[:,:,::-1]
-img2 = cv2.imread(sys.argv[2])[:,:,::-1]
+img1 = cv2.imread(sys.argv[1])[:, :, ::-1]
+img2 = cv2.imread(sys.argv[2])[:, :, ::-1]
 
 # added blur to reduce noise
 img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY), (3, 3), 0)
@@ -197,7 +273,9 @@ print "Match Count:\t\t", len(matches)
 matches = filter_matches(matches)
 print "Filtered Match Count:\t", len(matches)
 
-H = homography_ransac(matches, 50, kp1, kp2, verbose=True)
+H, _ = homography_ransac(matches, 500, kp1, kp2)
 
-stitch(img1, img2, H)
-
+canvas = stitch(img2, img1, H, BASE_ON_TOP=False)
+print "Final Image Size: \t", canvas.shape[:2]
+plt.imshow(canvas)
+plt.show()
