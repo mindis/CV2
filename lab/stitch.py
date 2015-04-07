@@ -92,7 +92,18 @@ def find_coeffs(pa, pb):
     return H
 
 
-def homography_ransac(matches, n, kp1, kp2, verbose=False):
+def homography_ransac(matches, n, kp1, kp2, verbose=False, local_optimisation=False):
+    """
+    Find homography matrix from 2 images
+    :param matches: pair keypoints matches between image 1 and image 2
+    :param n: number of ransac iteration
+    :param kp1: list of image 1's keypoints
+    :param kp2: list of image 2's keypoints
+    :param verbose: print debug code
+    :param local_optimisation: using LO-Ransac
+    :return: Homograpy matrix, number of inliers
+    """
+
     THRESHOLD = 3
 
     best_H = None
@@ -131,8 +142,12 @@ def homography_ransac(matches, n, kp1, kp2, verbose=False):
 
         # keep transformation matrix if it exceeds the current best
         if (best_inliers is None) or (best_inliers < inliers):
-            best_inliers = inliers
-            best_H = H
+            if local_optimisation:
+                # todo ::
+                pass
+            else:
+                best_inliers = inliers
+                best_H = H
 
     return best_H, best_inliers
 
@@ -213,9 +228,11 @@ def stitch(new_img, base_img, H, BASE_ON_TOP=False):
 
     if min_x < 0:
         move_h[0, 2] -= min_x
+        max_x -= min_x
 
     if min_y < 0:
         move_h[1, 2] -= min_y
+        max_y -= min_y
 
     mod_inv_h = move_h * H_inv
 
@@ -249,6 +266,10 @@ print
 print 'Stitching', sys.argv[1], 'and', sys.argv[2]
 print '=' * 80
 
+save_as = None
+if len(sys.argv) > 3:
+    save_as = sys.argv[3]
+
 img1 = cv2.imread(sys.argv[1])[:, :, ::-1]
 img2 = cv2.imread(sys.argv[2])[:, :, ::-1]
 
@@ -273,9 +294,20 @@ print "Match Count:\t\t", len(matches)
 matches = filter_matches(matches)
 print "Filtered Match Count:\t", len(matches)
 
-H, _ = homography_ransac(matches, 500, kp1, kp2)
+H, status = homography_ransac(matches, 500, kp1, kp2)
+print "Number of inliers:\t", status
 
-canvas = stitch(img2, img1, H, BASE_ON_TOP=False)
+canvas = stitch(img2, img1, H)
 print "Final Image Size: \t", canvas.shape[:2]
-plt.imshow(canvas)
-plt.show()
+
+if save_as:
+    plt.ioff()
+    fig = plt.figure(frameon=False)
+    ax = plt.Axes(fig, [0., 0., 1., 1.])
+    ax.set_axis_off()
+    fig.add_axes(ax)
+    fig.savefig(save_as)
+else:
+    plt.clf()
+    plt.imshow(canvas)
+    plt.show()
