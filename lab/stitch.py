@@ -171,8 +171,8 @@ def findDimensions(image, H):
 
 def create_mask(img):
     img2gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    _, mask = cv2.threshold(img2gray, 1, 255, cv2.THRESH_BINARY)
-    return cv2.bitwise_not(mask)
+    _, mask = cv2.threshold(img2gray, 1, 255, cv2.THRESH_BINARY_INV)
+    return mask
 
 
 def remove_black_edges(img):
@@ -227,14 +227,15 @@ def stitch(new_img, base_img, H, BASE_ON_TOP=False):
     move_h = np.matrix(np.identity(3), np.float32)
 
     if min_x < 0:
-        move_h[0, 2] -= min_x
+        move_h[0, 2] -= math.ceil(min_x)
         max_x -= min_x
 
     if min_y < 0:
-        move_h[1, 2] -= min_y
+        move_h[1, 2] -= math.ceil(min_y)
         max_y -= min_y
 
     mod_inv_h = move_h * H_inv
+
 
     img_w = int(math.ceil(max_x))
     img_h = int(math.ceil(max_y))
@@ -270,8 +271,8 @@ save_as = None
 if len(sys.argv) > 3:
     save_as = sys.argv[3]
 
-img1 = cv2.imread(sys.argv[1])[:, :, ::-1]
-img2 = cv2.imread(sys.argv[2])[:, :, ::-1]
+img1 = cv2.imread(sys.argv[2])[:, :, ::-1]
+img2 = cv2.imread(sys.argv[1])[:, :, ::-1]
 
 # added blur to reduce noise
 img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY), (3, 3), 0)
@@ -297,7 +298,7 @@ print "Filtered Match Count:\t", len(matches)
 H, status = homography_ransac(matches, 500, kp1, kp2)
 print "Number of inliers:\t", status
 
-canvas = stitch(img2, img1, H)
+canvas = stitch(img2, img1, H, BASE_ON_TOP=True)
 print "Final Image Size: \t", canvas.shape[:2]
 
 if save_as:
