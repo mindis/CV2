@@ -55,14 +55,14 @@ def drawMatches(img1, kp1, img2, kp2, matches):
         # colour blue
         cv2.line(out, (int(x1), int(y1)), (int(x2) + cols1, int(y2)), (255, 0, 0), 1)
 
-
+    return out
     # Show the image
-    cv2.imshow('Matched Features', out)
-    cv2.waitKey(0)
-    cv2.destroyAllWindows()
+    # cv2.imshow('Matched Features', out)
+    # cv2.waitKey(0)
+    # cv2.destroyAllWindows()
 
 
-def filter_matches(matches, ratio=0.75):
+def filter_matches(matches, ratio=0.75, sort=False):
     '''
     reduce weird random matches
     :param matches:
@@ -70,6 +70,10 @@ def filter_matches(matches, ratio=0.75):
     :return:
     '''
     filtered_matches = []
+
+    if sort:
+        matches = sorted(matches, key=lambda x: x[0].distance)
+
     for m in matches:
         if len(m) == 2 and m[0].distance < m[1].distance * ratio:
             filtered_matches.append(m[0])
@@ -205,7 +209,7 @@ def remove_black_edges(img):
     return img
 
 
-def stitch(new_img, base_img, H, BASE_ON_TOP=False):
+def stitch(new_img, base_img, H):
     """
     Stitch 2 images together
     :param new_img: image to stitch
@@ -236,7 +240,6 @@ def stitch(new_img, base_img, H, BASE_ON_TOP=False):
 
     mod_inv_h = move_h * H_inv
 
-
     img_w = int(math.ceil(max_x))
     img_h = int(math.ceil(max_y))
 
@@ -247,15 +250,8 @@ def stitch(new_img, base_img, H, BASE_ON_TOP=False):
     canvas = np.zeros((img_h, img_w, 3), np.uint8)
 
     # combining
-    if BASE_ON_TOP:
-        bg = cv2.add(canvas, base_img_warp, dtype=cv2.CV_8U)
-        fg = cv2.add(canvas, new_img_warp, mask=create_mask(base_img_warp), dtype=cv2.CV_8U)
-    else:
-        bg = cv2.add(canvas, base_img_warp, mask=create_mask(new_img_warp), dtype=cv2.CV_8U)
-        fg = cv2.add(canvas, new_img_warp, dtype=cv2.CV_8U)
-
-    # Now add the warped image
-    canvas = cv2.add(bg, fg)
+    canvas = cv2.max(canvas, base_img_warp)
+    canvas = cv2.max(canvas, new_img_warp)
 
     # remove black edges
     canvas = remove_black_edges(canvas)
@@ -263,51 +259,52 @@ def stitch(new_img, base_img, H, BASE_ON_TOP=False):
     return canvas
 
 
-print
-print 'Stitching', sys.argv[1], 'and', sys.argv[2]
-print '=' * 80
+if __name__ == '__main__':
+    print
+    print 'Stitching', sys.argv[1], 'and', sys.argv[2]
+    print '=' * 80
 
-save_as = None
-if len(sys.argv) > 3:
-    save_as = sys.argv[3]
+    save_as = None
+    if len(sys.argv) > 3:
+        save_as = sys.argv[3]
 
-img1 = cv2.imread(sys.argv[2])[:, :, ::-1]
-img2 = cv2.imread(sys.argv[1])[:, :, ::-1]
+    img1 = cv2.imread(sys.argv[1])[:, :, ::-1]
+    img2 = cv2.imread(sys.argv[2])[:, :, ::-1]
 
-# added blur to reduce noise
-img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY), (3, 3), 0)
-img2_ = cv2.GaussianBlur(cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY), (3, 3), 0)
+    # added blur to reduce noise
+    img1_ = cv2.GaussianBlur(cv2.cvtColor(img1, cv2.COLOR_RGB2GRAY), (3, 3), 0)
+    img2_ = cv2.GaussianBlur(cv2.cvtColor(img2, cv2.COLOR_RGB2GRAY), (3, 3), 0)
 
-# Initiate SIFT detector
-sift = cv2.SIFT()
+    # Initiate SIFT detector
+    sift = cv2.SIFT()
 
-# find the keypoints and descriptors with SIFT
-kp1, des1 = sift.detectAndCompute(img1_, None)
-kp2, des2 = sift.detectAndCompute(img2_, None)
+    # find the keypoints and descriptors with SIFT
+    kp1, des1 = sift.detectAndCompute(img1_, None)
+    kp2, des2 = sift.detectAndCompute(img2_, None)
 
-FLANN_INDEX_KDTREE = 1  # bug: flann enums are missing
-flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-matcher = cv2.FlannBasedMatcher(flann_params, {})
+    FLANN_INDEX_KDTREE = 1  # bug: flann enums are missing
+    flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
+    matcher = cv2.FlannBasedMatcher(flann_params, {})
 
-matches = matcher.knnMatch(des1, trainDescriptors=des2, k=2)
-print "Match Count:\t\t", len(matches)
+    matches = matcher.knnMatch(des1, trainDescriptors=des2, k=2)
+    print "Match Count:\t\t", len(matches)
 
-matches = filter_matches(matches)
-print "Filtered Match Count:\t", len(matches)
+    matches = filter_matches(matches)
+    print "Filtered Match Count:\t", len(matches)
 
-H, status = homography_ransac(matches, 500, kp1, kp2)
-print "Number of inliers:\t", status
+    H, status = homography_ransac(matches, 500, kp1, kp2)
+    print "Number of inliers:\t", status
 
-canvas = stitch(img2, img1, H, BASE_ON_TOP=True)
-print "Final Image Size: \t", canvas.shape[:2]
+    canvas = stitch(img2, img1, H)
+    print "Final Image Size: \t", canvas.shape[:2]
 
-if save_as:
-    fig = plt.figure(frameon=False)
-    ax = plt.Axes(fig, [0., 0., 1., 1.])
-    ax.set_axis_off()
-    fig.add_axes(ax)
-    ax.imshow(canvas)
-    fig.savefig(save_as)
-else:
-    plt.imshow(canvas)
-    plt.show()
+    if save_as:
+        fig = plt.figure(frameon=False)
+        ax = plt.Axes(fig, [0., 0., 1., 1.])
+        ax.set_axis_off()
+        fig.add_axes(ax)
+        ax.imshow(canvas)
+        fig.savefig(save_as)
+    else:
+        plt.imshow(canvas)
+        plt.show()
