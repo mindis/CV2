@@ -3,7 +3,7 @@ import sys
 import random
 import math
 import numpy as np
-from stitch import filter_matches
+from ransac import ransac
 from scipy.spatial import distance
 
 def filter_matches(matches, ratio=0.75):
@@ -11,7 +11,6 @@ def filter_matches(matches, ratio=0.75):
     for m in matches:
         if m[0].distance < m[1].distance * ratio:
             filtered_matches.append(m[0])
-
     return filtered_matches
 
 def normalized_t(points):
@@ -46,6 +45,7 @@ def eight_point(points, **kwargs):
 
 def normalized_eight_point(points, T1, T2):
     A = []
+    
     for sample in points:
         (x1, y1), (x2, y2) = sample
         x1, y1, _ = np.dot(T1, [x1, y1, 1])
@@ -55,42 +55,24 @@ def normalized_eight_point(points, T1, T2):
     U, s, V = np.linalg.svd(A)
     smallest_s_index =  np.argmin(s)
     F = np.array(V[smallest_s_index]).reshape((3, 3))
+    U, s, V = np.linalg.svd(F)
+    smallest_s_index = np.argmin(s)
+    s[smallest_s_index] = 0
 
-    return np.dot(T2, np.dot(F, T1))  
+    F = np.dot(U, np.dot(np.diag(s), V))
+    F = np.dot(T2, np.dot(F, T1))
+    return F / F[2,2]
 
 def sampson_distance(points, F):
     coords1, coords2 = points
-    coords1 = np.append(coords1, 1)
-    coords2 = np.append(coords2, 1)
+    coords1 = [coords1[0], coords1[1], 1]
+    coords2 = [coords2[0], coords2[1], 1]
 
     num = np.dot(np.array(coords2).T, np.dot(F, np.array(coords1))) ** 2
     Fp1 = np.dot(F, coords1)
     Fp2 = np.dot(F, coords2)
-    denum = Fp1[0] ** 2 + Fp1[1] ** 2 + Fp2[0] ** 2 + Fp2[1] ** 2
+    denum = (Fp1 ** 2).sum() + (Fp2 ** 2).sum()
     return num / denum
-
-def ransac(sample_pop, n_iter=50, algorithm=eight_point,
-        error_function=sampson_distance, n_samples=8,
-        additional_args=None):
-    
-    smallest_err = float('inf')
-    best = None
-    n_samples = min(n_samples, len(points1))
-
-    for _ in xrange(n_iter):
-        sample = random.sample(zip(points1, points2), n_samples)
-        result = algorithm(sample, **additional_args)
-        err = 0
-        for points in zip(points1, points2):
-            err += error_function(points, result)
-
-        if err < smallest_err:
-            smallest_err = err
-            best = result
-    
-    return best
-
-
 
 def blur_image(img, gaussian_size=(3,3)):
     return cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), gaussian_size, 0)
@@ -145,7 +127,7 @@ if __name__ == "__main__":
         additional_args['T2'] = T2
         f = normalized_eight_point
 
-    F = ransac(sample_pop, n_iter=1000, algorithm=f,
+    F = ransac(sample_pop, algorithm=f,
             error_function=sampson_distance, 
             additional_args=additional_args)
     print F
