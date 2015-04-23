@@ -19,6 +19,7 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=100,
         if err < smallest_err:
             smallest_err = err
             best = result
+            best_sample = sample
     
-    return best
+    return best, best_sample
 

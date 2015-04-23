@@ -32,18 +32,17 @@ def eight_point(points, **kwargs):
     A = []
 
     for sample in points:
-        (x1, y1), (x2, y2) = sample
-        A.append([x1 * x2, x1 * y2, x1, y1 * x2, y1 * y2, y1, x2, y2, 1])
+        (x, y), (xp, yp) = sample
+        A.append([xp * x, xp * y, xp, yp * x, yp * y, yp, x, y, 1])
 
     U, s, V = np.linalg.svd(A)
-    smallest_s_index = np.argmin(s)
-    F = np.array(V[smallest_s_index]).reshape((3, 3))
 
+    F = V[-1].reshape(3,3)
+    
     U, s, V = np.linalg.svd(F)
-    smallest_s_index = np.argmin(s)
-    s[smallest_s_index] = 0
-
+    s[2] = 0
     F = np.dot(U, np.dot(np.diag(s), V))
+    
     return F / F[2, 2]
 
 
@@ -82,6 +81,20 @@ def sampson_distance(points, F):
 
 def blur_image(img, gaussian_size=(3, 3)):
     return cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), gaussian_size, 0)
+
+def plot_epipolar_line(im, F, x):
+    """ Plot the epipole and epipolar line F*x=0
+        in an image. F is the fundamental matrix 
+        and x a point in the other image."""
+    
+    m,n = im.shape[0], im.shape[1]
+    line = np.dot(F,x)
+    
+    # epipolar line parameter and values
+    t = np.linspace(0,n,100)
+    lt = np.array([(line[2]+line[0]*tt)/(-line[1]) for tt in t])
+    
+    plt.plot(t,lt,linewidth=2)
 
 
 if __name__ == "__main__":
@@ -125,8 +138,9 @@ if __name__ == "__main__":
 
     sample_pop = zip(points1, points2)
     f = eight_point
-    normalize = True
+    normalize = False
     additional_args = {}
+    
     if normalize:
         T1 = normalized_t(points1)
         T2 = normalized_t(points2)
@@ -134,24 +148,32 @@ if __name__ == "__main__":
         additional_args['T2'] = T2
         f = normalized_eight_point
 
-    F = ransac(sample_pop, algorithm=f,
+
+    F, best_sample = ransac(sample_pop, algorithm=f,
                error_function=sampson_distance,
                additional_args=additional_args)
     print F
 
     # TODO: Draw epipolar lines
-    n = 2
     f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
-    for (i, j) in sample_pop[:n]:
-        x = np.dot(F, [i[0], i[1], 1])
-        ax1.plot(x[0], x[1], 'r+')
-        ax1.plot(i[0], i[1], 'g*')
     ax1.imshow(img1)
+    ax1.set_xlim([img1.shape[1], 0])
+    ax1.set_ylim([img1.shape[0], 0])
 
-    for (i, j) in sample_pop[:n]:
-        x = np.dot(F, [j[0], j[1], 1])
-        ax2.plot(x[0], x[1], 'r+')
-        ax2.plot(j[0], j[1], 'g*')
-        # plt.plot([x[0], x[1]], [j[0], j[1]], 'k-')
     ax2.imshow(img2)
+    ax2.set_xlim([img2.shape[1], 0])
+    ax2.set_ylim([img2.shape[0], 0])
+
+    for (point1, point2) in best_sample:
+        plt.sca(ax1)
+        point = [point2[0], point2[1], 1]
+        plt.plot(point1[0], point1[1], '*')
+        plot_epipolar_line(img1, F, point)
+
+        plt.sca(ax2)
+        point = [point1[0], point1[1], 1]
+        plt.plot(point2[0], point2[1], '*')
+        plot_epipolar_line(img2, F.T, point)
+
     plt.show()
+
