@@ -178,9 +178,9 @@ def generate_point_view_matrix(dirname):
     # for all images in directory, create a sequential pair
     point_view_matrix = pd.DataFrame()
 
-    images = [f for f in listdir(dirname) if isfile(join(dirname, f))][:10]
+    images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
     
-    for i in xrange(len(images)-1):
+    for i in xrange(len(images)):
         i2 = i+1 if i+1<len(images) else 0
         print
         print 'Calculating epipolar lines', images[i], 'and', images[i2]
