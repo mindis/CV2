@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 def filter_matches(matches, ratio=0.75):
     filtered_matches = []
     for m in matches:
-        if m[0].distance < m[1].distance * ratio and not m[0].distance > 0.5:
+        if m[0].distance < m[1].distance * ratio:
             filtered_matches.append(m[0])
     return filtered_matches
 
@@ -101,7 +101,7 @@ def plot_epipolar_line(im, F, x):
     plt.plot(t, lt, linewidth=2)
 
 
-def get_fundamental_matrix_for_pair_image(img1, img2, filter_match=1, n_iter=500, acceptance=0.5):
+def get_fundamental_matrix_for_pair_image(img1, img2, filter_match=.5, n_iter=500, acceptance=0.5):
     # added blur to reduce noise
     img1_ = blur_image(img1)
     img2_ = blur_image(img2)
@@ -178,7 +178,7 @@ def generate_point_view_matrix(dirname):
     # for all images in directory, create a sequential pair
     point_view_matrix = pd.DataFrame()
 
-    images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
+    images = [f for f in listdir(dirname) if isfile(join(dirname, f))][:10]
     
     for i in xrange(len(images)):
         i2 = i+1 if i+1<len(images) else 0
@@ -191,6 +191,8 @@ def generate_point_view_matrix(dirname):
         img2 = cv2.imread(dirname + '/' + images[i2])[:, :, ::-1]
 
         F, inliers = get_fundamental_matrix_for_pair_image(img1, img2, n_iter=50)
+        if inliers is None:
+            continue
         if point_view_matrix.shape[1] == 0:
             for iix, (point1, point2) in enumerate(inliers):
                 fp = 'fp%d' % (iix + 1)
@@ -223,16 +225,14 @@ def get_dense_submatrix(pv_matrix, offset = 0, n_pictures = 50):
     Find a dense submatrix in `pv_matrix` that is visible on all n_picture pictures
     """
     subset = pv_matrix[offset:offset+2*n_pictures]
-    best_dense = subset[:,~np.isnan(subset).any(axis=0)]
-    return best_dense
+    print 'DENSE SUBMATRIX NOT WORKING'
+    return subset
 
 def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-
     dense = get_dense_submatrix(PVM)
-
     U, s, V = np.linalg.svd(dense)
     U3 = U[:,:3]
     S3 = np.diag(s[:3])

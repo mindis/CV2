@@ -17,6 +17,7 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
 
     sample_pop = np.array(sample_pop)
     bestfit = None
+    best_sample = None
     besterr = -np.inf
     
     if n_samples > len(sample_pop):
@@ -24,41 +25,26 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
                 population with length %d''' % (n_samples, len(sample_pop)))
 
     for i in range(1,n_iter+1):
-        maybeinliers, test_points = divide_sample(sample_pop, n_samples)
-        
+        maybe_idx = np.random.choice(len(sample_pop), size=n_samples)
+        maybeinliers = sample_pop[maybe_idx] 
+
         #Generate a model and calculate the error
         maybemodel = algorithm(maybeinliers, **additional_args)
-        test_err = get_error(error_function, maybemodel, test_points)
-        also_idxs = np.where(test_err < t)[0]   # select indices of rows with accepted points
-        alsoinliers = sample_pop[also_idxs]     # find the inliers of this model
+        test_err = get_error(error_function, maybemodel, sample_pop)
+        inlier_idx = np.where(test_err < t)[0]   # select indices of rows with accepted points
 
         # Check model acceptance
-        if len(alsoinliers) > acceptance * len(sample_pop):
+        if len(inlier_idx) > acceptance * len(sample_pop):
+            better_data = sample_pop[inlier_idx]
+            bettermodel = algorithm(better_data, **additional_args)
+            better_errs = get_error(error_function, bettermodel, better_data)
+            better_inliers_idx = np.where(better_errs < t)[0]
 
-
-            betterdata = np.concatenate((maybeinliers, alsoinliers))
-            bettermodel = algorithm(betterdata, **additional_args)
-            better_errs = get_error(error_function, bettermodel, betterdata)
-            betterinliers = betterdata[better_errs < t]
-
-            if betterinliers.shape[0] > besterr:
+            if len(better_inliers_idx) > besterr:
                 bestfit = bettermodel
-                besterr = betterinliers.shape[0]
-                best_sample = np.concatenate((maybeinliers, alsoinliers))
+                besterr = len(better_inliers_idx)
+                best_sample = better_data[better_inliers_idx]
 
                 if verbose:
                     print 'iteration %d - best inlier %d' % (i, besterr)
-
     return bestfit, best_sample
-
-#Split sample into points to use in algorithm and points to test error on.
-def divide_sample(sample_pop, n_samples):
-    maybe_idxs = np.random.choice(len(sample_pop), size=n_samples)
-    bool_idx = np.zeros((sample_pop.shape[0]), dtype=bool)
-    bool_idx[maybe_idxs] = True
-    maybeinliers = sample_pop[bool_idx]
-    test_points = sample_pop[~bool_idx]
-
-    return maybeinliers, test_points
-
-
