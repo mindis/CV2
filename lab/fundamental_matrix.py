@@ -14,7 +14,7 @@ from mpl_toolkits.mplot3d import Axes3D
 def filter_matches(matches, ratio=0.75):
     filtered_matches = []
     for m in matches:
-        if m[0].distance < m[1].distance * ratio:
+        if m[0].distance < m[1].distance * ratio and not m[0].distance > 0.5:
             filtered_matches.append(m[0])
     return filtered_matches
 
