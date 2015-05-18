@@ -178,8 +178,8 @@ def generate_point_view_matrix(dirname):
     # for all images in directory, create a sequential pair
     point_view_matrix = pd.DataFrame()
 
-    images = [f for f in listdir(dirname) if isfile(join(dirname, f))][:10]
-    
+    images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
+    images = images[:5] + images[-5:]
     for i in xrange(len(images)):
         i2 = i+1 if i+1<len(images) else 0
         print
@@ -203,6 +203,14 @@ def generate_point_view_matrix(dirname):
                 point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
         else:
             for (point1, point2) in inliers:
+                try:
+                    point_view_matrix.loc['img%d_x' % i]
+                except: #If the previous image had no matched points
+                    fp = 'fp%d' % (point_view_matrix.shape[1] + 1)
+                    point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
+                    point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
+                    continue
+
                 for fp, p in enumerate(zip(point_view_matrix.loc['img%d_x' % i], point_view_matrix.loc['img%d_y' % i])):
                     if (point1[0], point1[1]) == p:
                         point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
@@ -220,19 +228,21 @@ def generate_point_view_matrix(dirname):
 def move_to_mean(pv_matrix):
     return (pv_matrix.T - np.nanmean(pv_matrix, axis=1)).T
 
-def get_dense_submatrix(pv_matrix, offset = 0, n_pictures = 50):
+def get_dense_submatrix(pv_matrix):
     """
-    Find a dense submatrix in `pv_matrix` that is visible on all n_picture pictures
+    Find a dense submatrix in `pv_matrix`
     """
-    subset = pv_matrix[offset:offset+2*n_pictures]
-    print 'DENSE SUBMATRIX NOT WORKING'
-    return subset
+    col = pv_matrix[:,0]
+    bool_col = ~np.isnan(col)
+    rest = pv_matrix[bool_col, 1:]
+    dense = rest[:,(~np.isnan(rest)).all(axis=0)]
+    dense = np.hstack((col[bool_col,np.newaxis], dense))
+    return dense    
 
 def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
     dense = get_dense_submatrix(PVM)
+
     U, s, V = np.linalg.svd(dense)
     U3 = U[:,:3]
     S3 = np.diag(s[:3])
@@ -240,11 +250,16 @@ def structure_motion_from_PVM(PVM):
 
     motion = np.dot(U3, np.sqrt(S3))
     structure = np.dot(np.sqrt(S3), V3)
-    
+
+    plt.matshow(structure)
+    plt.show()
+
     xs = list(structure[0])
     ys = list(structure[1])
     zs = list(structure[2])
     
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
     ax.scatter(xs, ys, zs)
     plt.show()
 
