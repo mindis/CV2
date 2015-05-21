@@ -49,24 +49,15 @@ def eight_point(points, **kwargs):
 
 
 def normalized_eight_point(points, T1, T2):
-    A = []
-
+    normalized_points = []
     for sample in points:
         (x1, y1), (x2, y2) = sample
         x1, y1, _ = np.dot(T1, [x1, y1, 1])
         x2, y2, _ = np.dot(T2, [x2, y2, 1])
-        A.append([x1 * x2, x1 * y2, x1, y1 * x2, y1 * y2, y1, x2, y2, 1])
-
-    U, s, V = np.linalg.svd(A)
-    F = np.array(V[-1]).reshape((3, 3))
-
-    U, s, V = np.linalg.svd(F)
-    smallest_s_index = np.argmin(s)
-    s[smallest_s_index] = 0
-    F = np.dot(U, np.dot(np.diag(s), V))
-
+        normalized_points.append(((x1,y1),(x2, y2)))
+    
+    F = eight_point(normalized_points)
     F = np.dot(np.array(T1).T, np.dot(F, np.array(T2)))
-
     return F / F[2, 2]
 
 
@@ -87,9 +78,11 @@ def blur_image(img, gaussian_size=(3, 3)):
 
 
 def plot_epipolar_line(im, F, x):
-    """ Plot the epipole and epipolar line F*x=0
+    """ 
+        Plot the epipole and epipolar line F*x=0
         in an image. F is the fundamental matrix 
-        and x a point in the other image."""
+        and x a point in the other image.
+    """
 
     m, n = im.shape[0], im.shape[1]
     line = np.dot(F, x)
@@ -101,7 +94,10 @@ def plot_epipolar_line(im, F, x):
     plt.plot(t, lt, linewidth=2)
 
 
-def get_fundamental_matrix_for_pair_image(img1, img2, filter_match=.5, n_iter=500, acceptance=0.5):
+def get_fundamental_matrix(img1, img2, filter_match=.5, n_iter=500, acceptance=0.5):
+    """
+        Gets the fundamental matrix for `img1` and `img2` using RANSAC
+    """
     # added blur to reduce noise
     img1_ = blur_image(img1)
     img2_ = blur_image(img2)
@@ -151,6 +147,10 @@ def get_fundamental_matrix_for_pair_image(img1, img2, filter_match=.5, n_iter=50
 
 
 def draw_epipolar_line(img1, img2, F, best_sample):
+    """
+        Draws the epipolar lines for the best F and the best sample
+        returned by RANSAC for `img1` and `img2`
+    """
     f, (ax1, ax2) = plt.subplots(1, 2, sharey=True)
     ax1.imshow(img1)
     ax1.set_xlim([img1.shape[1], 0])
@@ -175,10 +175,12 @@ def draw_epipolar_line(img1, img2, F, best_sample):
 
 
 def generate_point_view_matrix(dirname):
-    # for all images in directory, create a sequential pair
+    """
+        Creates the point view matrix of all images in `dirname`.
+    """
     point_view_matrix = pd.DataFrame()
 
-    images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
+    images = [f for f in listdir(dirname) if isfile(join(dirname, f)) and f.endswith('.png')]
 
     for i in xrange(len(images)):
         i2 = i+1 if i+1<len(images) else 0
@@ -190,7 +192,7 @@ def generate_point_view_matrix(dirname):
         img1 = cv2.imread(dirname + '/' + images[i])[:, :, ::-1]
         img2 = cv2.imread(dirname + '/' + images[i2])[:, :, ::-1]
 
-        F, inliers = get_fundamental_matrix_for_pair_image(img1, img2, n_iter=50)
+        F, inliers = get_fundamental_matrix(img1, img2, n_iter=50)
         if inliers is None:
             continue
         if point_view_matrix.shape[1] == 0:
@@ -226,14 +228,21 @@ def generate_point_view_matrix(dirname):
     return point_view_matrix.as_matrix()
 
 def move_to_mean(pv_matrix):
+    """
+        Moves the center of every image to the centroid of the image
+    """
     return (pv_matrix.T - np.nanmean(pv_matrix, axis=1)).T
 
 def get_dense_submatrix(pv_matrix, offset = 0):
     """
-    Find a dense submatrix in `pv_matrix`
+    Finds the dense submatrix involving the first column in the point view 
+    matrix. Then removes those points from the point view matrix aswell.
     """
     
     #See in what photos the first point is visible
+    if not pv_matrix.shape[1]:
+        return np.array([]), np.array([])
+    
     col = pv_matrix[:,0]
     bool_col = ~np.isnan(col)
 
@@ -241,8 +250,6 @@ def get_dense_submatrix(pv_matrix, offset = 0):
     rel_part = pv_matrix[bool_col, :]
     overlapping_columns = (~np.isnan(rel_part)).all(axis=0)
 
-    print 'Overlap', overlapping_columns.shape
-    
     if not overlapping_columns.shape[0] >= 3:
         return get_dense_submatrix(pv_matrix[:,1])
 
@@ -253,12 +260,17 @@ def get_dense_submatrix(pv_matrix, offset = 0):
     return dense, pvm
 
 def eliminate_ambiguity(motion, structure):
-    m = motion.shape[0]/2
-    A = motion.reshape((m, 2))
-    I = np.identity() #Shape?
-    I = np.ravel(I)   #Vectorization of I
+    """
+    Eliminates the affine ambiguity of the motion and structure matrices.
+    """
+
+    A = motion
+    X = np.outer(A,A)
     
-    L = np.linalg.lstsq(A,I)
+    I = np.identity(3) #Shape not sure
+    I = np.ravel(I)   #Vectorization of I
+
+    L = np.linalg.lstsq(X,I)[0]
     L = L.reshape() #Unvectorization of L. Shape unknown.
 
     C = np.linalg.cholesky(L)
@@ -274,10 +286,10 @@ def structure_motion_from_PVM(PVM):
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     
-    print 'PVM', PVM.shape
-
     while PVM.shape[0] > 3:
         dense, PVM = get_dense_submatrix(PVM)
+        if not dense.shape[0] > 3:
+            continue
 
         U, s, V = np.linalg.svd(dense)
         U3 = U[:,:3]
@@ -287,12 +299,10 @@ def structure_motion_from_PVM(PVM):
         motion = U3    
         structure = np.dot(S3, V3)
 
-        if not structure.shape[0] == 3:
+        if structure.shape[0] < 3:
             break
 
-        print 'Struc', structure.shape
-
-        motion, structure = eliminate_ambiguity(motion, structure)
+        #motion, structure = eliminate_ambiguity(motion, structure)
 
         xs = list(structure[0])
         ys = list(structure[1])
@@ -305,14 +315,3 @@ def structure_motion_from_PVM(PVM):
 if __name__ == "__main__":
     PVM = generate_point_view_matrix(sys.argv[1])
     structure_motion_from_PVM(PVM)
-    # # Draw epipolar lines
-    # draw_epipolar_line(img1, img2, F, inliers[:8])
-    #
-    # print F
-    #
-    # # inliers are the match between two images
-    # print inliers
-    # Chaining
-    # todo: convert points to 3d space
-    # todo: create point-view matrix
-
