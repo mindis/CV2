@@ -10,6 +10,7 @@ def get_error(error_function, model, test_points):
 
 
 # lo-ransac
+# todo: add converge detection
 def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
            t=1E-3, acceptance=0.25, verbose=True,
            additional_args=None):
@@ -19,6 +20,7 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
     bestfit = None
     best_sample = None
     besterr = -np.inf
+    converge_counter = 0
     
     if n_samples > len(sample_pop):
         raise Exception('''It is impossible to sample %d samples from 
@@ -28,7 +30,7 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
         maybe_idx = np.random.choice(len(sample_pop), size=n_samples)
         maybeinliers = sample_pop[maybe_idx] 
 
-        #Generate a model and calculate the error
+        # Generate a model and calculate the error
         maybemodel = algorithm(maybeinliers, **additional_args)
         test_err = get_error(error_function, maybemodel, sample_pop)
         inlier_idx = np.where(test_err < t)[0]   # select indices of rows with accepted points
@@ -47,4 +49,13 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
 
                 if verbose:
                     print 'iteration %d - best inlier %d' % (i, besterr)
+
+                # reset counter
+                converge_counter = 0
+
+        converge_counter += 1
+        if converge_counter > 15:
+            print "converged.."
+            break
+
     return bestfit, best_sample

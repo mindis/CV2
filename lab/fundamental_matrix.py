@@ -11,6 +11,7 @@ from os.path import isfile, join
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
 
+
 def filter_matches(matches, ratio=0.75):
     filtered_matches = []
     for m in matches:
@@ -174,77 +175,90 @@ def draw_epipolar_line(img1, img2, F, best_sample):
     plt.show()
 
 
-def generate_point_view_matrix(dirname):
+def generate_point_view_matrix(dirname, use_cache=True):
     # for all images in directory, create a sequential pair
     point_view_matrix = pd.DataFrame()
 
-    images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
-    images = images[:5] + images[-5:]
-    for i in xrange(len(images)):
-        i2 = i+1 if i+1<len(images) else 0
-        print
-        print 'Calculating epipolar lines', images[i], 'and', images[i2]
-        print '=' * 80
-        
-        
-        img1 = cv2.imread(dirname + '/' + images[i])[:, :, ::-1]
-        img2 = cv2.imread(dirname + '/' + images[i2])[:, :, ::-1]
+    if use_cache and isfile(dirname + '.csv'):
+        point_view_matrix = point_view_matrix.from_csv(open(dirname + '.csv', 'r'))
+    else:
+        images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
+        # images = images[:5] + images[-5:]
 
-        F, inliers = get_fundamental_matrix_for_pair_image(img1, img2, n_iter=50)
-        if inliers is None:
-            continue
-        if point_view_matrix.shape[1] == 0:
-            for iix, (point1, point2) in enumerate(inliers):
-                fp = 'fp%d' % (iix + 1)
-                # point_view_matrix[fp] = []
-                point_view_matrix.ix['img%d_x' % i, fp] = point1[0]
-                point_view_matrix.ix['img%d_y' % i, fp] = point1[1]
-                point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
-                point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
-        else:
-            for (point1, point2) in inliers:
-                try:
-                    point_view_matrix.loc['img%d_x' % i]
-                except: #If the previous image had no matched points
-                    fp = 'fp%d' % (point_view_matrix.shape[1] + 1)
-                    point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
-                    point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
-                    continue
+        for i in xrange(len(images)):
+            i2 = i + 1 if i + 1 < len(images) else 0
+            print
+            print 'Calculating epipolar lines', images[i], 'and', images[i2]
+            print '=' * 80
 
-                for fp, p in enumerate(zip(point_view_matrix.loc['img%d_x' % i], point_view_matrix.loc['img%d_y' % i])):
-                    if (point1[0], point1[1]) == p:
-                        point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
-                        point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
-                        break
-                else:   # If the point was not found
-                    fp = 'fp%d' % (point_view_matrix.shape[1]+1)
+            img1 = cv2.imread(dirname + '/' + images[i])[:, :, ::-1]
+            img2 = cv2.imread(dirname + '/' + images[i2])[:, :, ::-1]
+
+            F, inliers = get_fundamental_matrix_for_pair_image(img1, img2, filter_match=.75, n_iter=50, acceptance=0.01)
+            if inliers is None:
+                continue
+
+            if point_view_matrix.shape[1] == 0:
+                for iix, (point1, point2) in enumerate(inliers):
+                    fp = 'fp%d' % (iix + 1)
+                    # point_view_matrix[fp] = []
                     point_view_matrix.ix['img%d_x' % i, fp] = point1[0]
                     point_view_matrix.ix['img%d_y' % i, fp] = point1[1]
                     point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
                     point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
+            else:
+                for (point1, point2) in inliers:
+                    try:
+                        point_view_matrix.loc['img%d_x' % i]
+                    except:  # If the previous image had no matched points
+                        fp = 'fp%d' % (point_view_matrix.shape[1] + 1)
+                        point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
+                        point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
+                        continue
+
+                    for fp, p in enumerate(
+                            zip(point_view_matrix.loc['img%d_x' % i], point_view_matrix.loc['img%d_y' % i])):
+                        if (point1[0], point1[1]) == p:
+                            point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
+                            point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
+                            break
+                    else:  # If the point was not found
+                        fp = 'fp%d' % (point_view_matrix.shape[1] + 1)
+                        point_view_matrix.ix['img%d_x' % i, fp] = point1[0]
+                        point_view_matrix.ix['img%d_y' % i, fp] = point1[1]
+                        point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
+                        point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
+
+        point_view_matrix.to_csv(open(dirname + '.csv', 'w'))
 
     return point_view_matrix.as_matrix()
 
+
 def move_to_mean(pv_matrix):
+    """
+    Normalize the point coordinates by translating them to the mean of the points in each view
+    """
     return (pv_matrix.T - np.nanmean(pv_matrix, axis=1)).T
+
 
 def get_dense_submatrix(pv_matrix):
     """
     Find a dense submatrix in `pv_matrix`
     """
-    col = pv_matrix[:,0]
+    col = pv_matrix[:, 0]
     bool_col = ~np.isnan(col)
     rest = pv_matrix[bool_col, 1:]
-    dense = rest[:,(~np.isnan(rest)).all(axis=0)]
-    dense = np.hstack((col[bool_col,np.newaxis], dense))
-    return dense    
+    dense = rest[:, (~np.isnan(rest)).all(axis=0)]
+    dense = np.hstack((col[bool_col, np.newaxis], dense))
+    return dense
+
 
 def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
     dense = get_dense_submatrix(PVM)
 
     U, s, V = np.linalg.svd(dense)
-    U3 = U[:,:3]
+    U3 = U[:, :3]
     S3 = np.diag(s[:3])
     V3 = V[:3]
 
@@ -257,7 +271,7 @@ def structure_motion_from_PVM(PVM):
     xs = list(structure[0])
     ys = list(structure[1])
     zs = list(structure[2])
-    
+
     fig = plt.figure()
     ax = fig.gca(projection='3d')
     ax.scatter(xs, ys, zs)
@@ -266,6 +280,9 @@ def structure_motion_from_PVM(PVM):
 
 if __name__ == "__main__":
     PVM = generate_point_view_matrix(sys.argv[1])
+    plt.matshow(PVM, interpolation='nearest', cmap='Greys')
+    plt.show()
+
     structure_motion_from_PVM(PVM)
     # # Draw epipolar lines
     # draw_epipolar_line(img1, img2, F, inliers[:8])
