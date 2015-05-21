@@ -275,20 +275,18 @@ def eliminate_ambiguity(motion, structure):
     """
     Eliminates the affine ambiguity of the motion and structure matrices.
     """
-
-    A = motion
-    X = np.outer(A,A)
     
-    I = np.identity(2) #Shape not sure
-    I = np.ravel(I)   #Vectorization of I
-
-    L = np.linalg.lstsq(X,I)[0]
-    L = L.reshape() #Unvectorization of L. Shape unknown.
-
+    n_camera = int(motion.shape[0])/2
+    A = motion
+    B = np.empty((n_camera * 2,3))
+    for i in range(n_camera):
+        B[(i*2) : (i*2)+2, :] = np.linalg.pinv(A[(i*2) : (i*2)+2,:].T)
+    
+    L = np.linalg.lstsq(A,B)[0]
     C = np.linalg.cholesky(L)
 
     motion = np.dot(motion, C)
-    structure = np.dot(np.pinv(C), structure)
+    structure = np.dot(np.linalg.pinv(C), structure)
     
     return motion, structure
 
@@ -296,6 +294,7 @@ def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
     fig = plt.figure()
     ax = fig.gca(projection='3d')
+    
     
     while PVM.shape[0] > 3:
         dense, PVM = get_dense_submatrix(PVM)
@@ -318,14 +317,18 @@ def structure_motion_from_PVM(PVM):
         xs = list(structure[0])
         ys = list(structure[1])
         zs = list(structure[2])
-        
+
         ax.scatter(xs, ys, zs)
-    plt.show()
+
+        plt.show()
+        fig.clf()
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+
 
 
 if __name__ == "__main__":
     PVM = generate_point_view_matrix(sys.argv[1])
-    plt.matshow(PVM, interpolation='nearest', cmap='Greys')
-    plt.show()
-
+    #plt.matshow(PVM, interpolation='nearest', cmap='Greys')
+    #plt.show()
     structure_motion_from_PVM(PVM)
