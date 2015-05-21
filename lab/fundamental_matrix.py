@@ -179,7 +179,7 @@ def generate_point_view_matrix(dirname):
     point_view_matrix = pd.DataFrame()
 
     images = [f for f in listdir(dirname) if isfile(join(dirname, f))]
-    images = images[:5] + images[-5:]
+
     for i in xrange(len(images)):
         i2 = i+1 if i+1<len(images) else 0
         print
@@ -228,39 +228,77 @@ def generate_point_view_matrix(dirname):
 def move_to_mean(pv_matrix):
     return (pv_matrix.T - np.nanmean(pv_matrix, axis=1)).T
 
-def get_dense_submatrix(pv_matrix):
+def get_dense_submatrix(pv_matrix, offset = 0):
     """
     Find a dense submatrix in `pv_matrix`
     """
+    
+    #See in what photos the first point is visible
     col = pv_matrix[:,0]
     bool_col = ~np.isnan(col)
-    rest = pv_matrix[bool_col, 1:]
-    dense = rest[:,(~np.isnan(rest)).all(axis=0)]
-    dense = np.hstack((col[bool_col,np.newaxis], dense))
-    return dense    
+
+    #Find out which points at least overlap
+    rel_part = pv_matrix[bool_col, :]
+    overlapping_columns = (~np.isnan(rel_part)).all(axis=0)
+
+    print 'Overlap', overlapping_columns.shape
+    
+    if not overlapping_columns.shape[0] >= 3:
+        return get_dense_submatrix(pv_matrix[:,1])
+
+    #Change PVM to not overlap and dense submatrix to do overlap
+    pvm = pv_matrix[:, ~overlapping_columns]
+    dense = rel_part[:, overlapping_columns]
+    
+    return dense, pvm
+
+def eliminate_ambiguity(motion, structure):
+    m = motion.shape[0]/2
+    A = motion.reshape((m, 2))
+    I = np.identity() #Shape?
+    I = np.ravel(I)   #Vectorization of I
+    
+    L = np.linalg.lstsq(A,I)
+    L = L.reshape() #Unvectorization of L. Shape unknown.
+
+    C = np.linalg.cholesky(L)
+
+    motion = np.dot(motion, C)
+    structure = np.dot(np.pinv(C), structure)
+    
+    return motion, structure
 
 def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
-    dense = get_dense_submatrix(PVM)
-
-    U, s, V = np.linalg.svd(dense)
-    U3 = U[:,:3]
-    S3 = np.diag(s[:3])
-    V3 = V[:3]
-
-    motion = np.dot(U3, np.sqrt(S3))
-    structure = np.dot(np.sqrt(S3), V3)
-
-    plt.matshow(structure)
-    plt.show()
-
-    xs = list(structure[0])
-    ys = list(structure[1])
-    zs = list(structure[2])
     
     fig = plt.figure()
     ax = fig.gca(projection='3d')
-    ax.scatter(xs, ys, zs)
+    
+    print 'PVM', PVM.shape
+
+    while PVM.shape[0] > 3:
+        dense, PVM = get_dense_submatrix(PVM)
+
+        U, s, V = np.linalg.svd(dense)
+        U3 = U[:,:3]
+        S3 = np.diag(s[:3])
+        V3 = V[:3]
+
+        motion = U3    
+        structure = np.dot(S3, V3)
+
+        if not structure.shape[0] == 3:
+            break
+
+        print 'Struc', structure.shape
+
+        motion, structure = eliminate_ambiguity(motion, structure)
+
+        xs = list(structure[0])
+        ys = list(structure[1])
+        zs = list(structure[2])
+        
+        ax.scatter(xs, ys, zs)
     plt.show()
 
 
