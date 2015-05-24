@@ -107,11 +107,8 @@ def get_fundamental_matrix(img1, img2, filter_match=.5, n_iter=500, acceptance=0
     kp1, des1 = sift.detectAndCompute(img1_, None)
     kp2, des2 = sift.detectAndCompute(img2_, None)
 
-    FLANN_INDEX_KDTREE = 1
-    flann_params = dict(algorithm=FLANN_INDEX_KDTREE, trees=5)
-    matcher = cv2.FlannBasedMatcher(flann_params, {})
-
-    matches = matcher.knnMatch(des1, trainDescriptors=des2, k=2)
+    bf = cv2.BFMatcher()
+    matches = bf.knnMatch(des1,des2, k=2) 
     print "Match Count:\t\t", len(matches)
 
     matches = filter_matches(matches, filter_match)
@@ -194,7 +191,8 @@ def generate_point_view_matrix(dirname, use_cache=True):
             img1 = cv2.imread(dirname + '/' + images[i])[:, :, ::-1]
             img2 = cv2.imread(dirname + '/' + images[i2])[:, :, ::-1]
 
-            F, inliers = get_fundamental_matrix_for_pair_image(img1, img2, filter_match=.75, n_iter=50, acceptance=0.01)
+            F, inliers = get_fundamental_matrix(img1, img2, filter_match=.75, n_iter=50, acceptance=0.01)
+            
             if inliers is None:
                 continue
 

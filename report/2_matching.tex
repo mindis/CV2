@@ -1,0 +1,8 @@
+\section{Keypoint extraction and matching}
+\label{matching}
+The first step in making a 3D reconstruction is to extract feature points from the two images.
+In this report we will use the SIFT feature descriptors, introduced by Lowe\cite{SIFT} in 2004, as it has been the defacto representation method for feature points for the last years.
+\fixme{Elaborate SIFT?}
+To do the matching with theses sift descriptors we use a brute force matcher. 
+For every keypoint in the first image we will find the keypoints with the smallest and the next-to-smallest euclidian distance in the second image. 
+To filter out ambigous matches we applied a ratio test. If the distance of the best match was bigger then a ratio of the second-to-best match then the keypoints were discarded.

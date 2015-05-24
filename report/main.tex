@@ -1,7 +1,10 @@
 \documentclass{article}
 \usepackage[utf8]{inputenc}
+\usepackage{xcolor}
 
-\title{Structure from motion \\ \small{Computer Vision 2}}
+\newcommand{\fixme}[1]{\textcolor{red}{#1}}
+
+\title{3D Reconstruction \\ \small{Computer Vision 2}}
 
 \author{Finde Xumara \\ ?????? \and Luka Stout \\ 10616713}
 
@@ -9,19 +12,14 @@
 
 \maketitle
 
-\section{Introduction}
-
 %The report should be to the point, but complete. Based on the report we will grade your understanding, the final result and the correctness of your code (do not put large code listings! Only show the essential lines).
 %The report is judged on your understanding. Do not ‘just’ do the assignments. Always give us your reasons why you did something. If possible, evaluate the effect of parameters, give insight, and explain the steps.
 
-
-
-\section{Background}
-
-\section{Data}
-
-\section{Experiments}
-
-\section{Conclusion}
+\input{1_intro.tex}
+\input{2_matching.tex}
+\input{3_structure.tex}
+\input{4_bundle.tex}
+\input{5_experiments.tex}
+\input{6_conclusion.tex}
 
 \end{document}
