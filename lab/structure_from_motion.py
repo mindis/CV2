@@ -10,6 +10,7 @@ from os import listdir
 from os.path import isfile, join
 import pandas as pd
 from mpl_toolkits.mplot3d import Axes3D
+from ICP import ICP
 
 
 def filter_matches(matches, ratio=0.75):
@@ -250,10 +251,10 @@ def get_dense_submatrix(pv_matrix):
     matrix. Then removes those points from the point view matrix aswell.
     """
     
-    #See in what photos the first point is visible
     if not pv_matrix.shape[1]:
         return np.array([]), np.array([])
     
+    #See in what photos the first point is visible 
     col = pv_matrix[:,0]
     bool_col = ~np.isnan(col)
 
@@ -290,10 +291,9 @@ def eliminate_ambiguity(motion, structure):
 
 def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
-    fig = plt.figure()
-    ax = fig.gca(projection='3d')
-    
-    
+
+    structures = []
+
     while PVM.shape[0] > 3:
         dense, PVM = get_dense_submatrix(PVM)
         if not dense.shape[0] > 3:
@@ -311,17 +311,49 @@ def structure_motion_from_PVM(PVM):
             break
 
         motion, structure = eliminate_ambiguity(motion, structure)
-
-        xs = list(structure[0])
-        ys = list(structure[1])
-        zs = list(structure[2])
-
-        ax.scatter(xs, ys, zs)
-
-        plt.show()
-        fig.clf()
+        
         fig = plt.figure()
         ax = fig.gca(projection='3d')
+        ax.scatter(structure[0], structure[1], structure[2])
+        plt.show()
+
+        structures.append(structure)
+    
+    #fig = plt.figure()
+    #ax = fig.gca(projection='3d')
+    #ax.scatter(structures[0].T[:,0], structures[0].T[:,1], structures[0].T[:,2], color='b')
+
+    #ground_structure = structures[0]
+    #queue = structures[1:]
+    #
+    #while queue:
+    #    print
+    #    print len(queue), 'structures to go'
+    #    best = None
+    #    best_distance = float('inf')
+    #    best_i = None
+    #    for i, structure in enumerate(queue):
+    #        print i+1,' out of', len(queue), '\r',
+    #        sys.stdout.flush()
+    #        R, t, distance = ICP(structure, ground_structure)
+    #        new_structure = np.dot(structure.T, R) + t
+
+    #        if distance < best_distance:
+    #            best = new_structure.T
+    #            best_i = i
+    #            best_distance = distance.sum()        
+    #    
+    #    fig = plt.figure()
+    #    ax = fig.gca(projection='3d')
+    #    ax.scatter(ground_structure.T[:,0], ground_structure.T[:,1], ground_structure.T[:,2], color='b')
+    #    ax.scatter(best.T[:,0], best.T[:,1], best.T[:,2], color='g')
+    #    plt.show()
+
+    #    ground_structure = np.hstack((ground_structure, best))
+
+    #    queue.pop(best_i)
+
+        
 
 
 
