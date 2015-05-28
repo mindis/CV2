@@ -312,10 +312,10 @@ def structure_motion_from_PVM(PVM):
 
         motion, structure = eliminate_ambiguity(motion, structure)
         
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.scatter(structure[0], structure[1], structure[2])
-        plt.show()
+        #fig = plt.figure()
+        #ax = fig.gca(projection='3d')
+        #ax.scatter(structure[0], structure[1], structure[2])
+        #plt.show()
 
         structures.append(structure)
     
@@ -323,35 +323,22 @@ def structure_motion_from_PVM(PVM):
     #ax = fig.gca(projection='3d')
     #ax.scatter(structures[0].T[:,0], structures[0].T[:,1], structures[0].T[:,2], color='b')
 
-    #ground_structure = structures[0]
-    #queue = structures[1:]
-    #
-    #while queue:
-    #    print
-    #    print len(queue), 'structures to go'
-    #    best = None
-    #    best_distance = float('inf')
-    #    best_i = None
-    #    for i, structure in enumerate(queue):
-    #        print i+1,' out of', len(queue), '\r',
-    #        sys.stdout.flush()
-    #        R, t, distance = ICP(structure, ground_structure)
-    #        new_structure = np.dot(structure.T, R) + t
 
-    #        if distance < best_distance:
-    #            best = new_structure.T
-    #            best_i = i
-    #            best_distance = distance.sum()        
-    #    
-    #    fig = plt.figure()
-    #    ax = fig.gca(projection='3d')
-    #    ax.scatter(ground_structure.T[:,0], ground_structure.T[:,1], ground_structure.T[:,2], color='b')
-    #    ax.scatter(best.T[:,0], best.T[:,1], best.T[:,2], color='g')
-    #    plt.show()
 
-    #    ground_structure = np.hstack((ground_structure, best))
+    for i, structure in enumerate(structures[:-2]):
+        print i+1,' out of', len(structures), '\r',
+        sys.stdout.flush()
+        R, t, distance = ICP(structures[i+1], structure)
 
-    #    queue.pop(best_i)
+        new_structure = (np.dot(structures[i+1].T, R) + t).T
+
+        fig = plt.figure()
+        ax = fig.gca(projection='3d')
+        ax.scatter(structure.T[:,0], structure.T[:,1], structure.T[:,2], color='b')
+        ax.scatter(new_structure.T[:,0], new_structure.T[:,1], new_structure.T[:,2], color='g')
+        plt.show()
+
+
 
         
 
