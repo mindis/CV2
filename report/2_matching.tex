@@ -7,7 +7,7 @@ occupies a relatively small area of the image (for robust to clutter and occlusi
 There are multiple ways of extracting them from an image.
 For instance, one could use dense sampling \cite{DSIFT} or random sampling;
 however, both of these method did not prove to be useful when used in conjunction with the descriptors that we use for these keypoints.
-Therefore, in this report we will use the SIFT feature descriptors, introduced by Lowe\cite{SIFT} in 2004, as it has been the de facto representation method for feature points for the past years.
+Therefore, in this report we will use the SIFT feature descriptors, introduced by Lowe \cite{SIFT} in 2004, as it has been the de facto representation method for feature points for the past years.
 
 SIFT can robustly identify objects even among clutter and under partial occlusion, because it is invariant to uniform scaling, orientation, and partially invariant to illumination changes and affine distorting up to 60 degrees out of plane rotation.
 
@@ -55,9 +55,8 @@ The ratio test trimmed down the matches from 1419 matches to only 200 relevant o
 	\label{fig:bear}
 \end{figure}
 
-We found after some experiments that this value however does not work as well for teddy bear data (seen in Figure~\ref{fig:bear} set that we will try to reconstruct,
-too many points get removed to still be able to reconstruct the teddy bear,
-so, we decided to have a ratio of $.75$.
+We found after some experiments that this value however does not work as well for the teddy bear data set that we will try to reconstruct, because too many points get removed to still be able to reconstruct the teddy bear,
+therefor we decided to have a ratio of $.75$.
 
 In addition, with LO-RANSAC, 50 iterations is enough while with standard RANSAC we need at least 500 iterations to find a good estimation of homography.
-We also found out that by blurring the image with gaussian blur before extracting the feature can make the SIFT descriptor robust to background noise.
+We also found out that by blurring the image with Gaussian blur before extracting the feature can make the SIFT descriptor robust to background noise.
