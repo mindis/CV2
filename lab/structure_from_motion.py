@@ -172,6 +172,10 @@ def draw_epipolar_line(img1, img2, F, best_sample):
 
     plt.show()
 
+def close_to(point1, point2, treshold=2):
+    x1, y1 = point1
+    x2, y2 = point2
+    return x1-treshold <= x2 <= x1+treshold and y1-treshold <= y2 <= y1+treshold
 
 def generate_point_view_matrix(dirname, use_cache=True):
     # for all images in directory, create a sequential pair
@@ -186,7 +190,7 @@ def generate_point_view_matrix(dirname, use_cache=True):
         for i in xrange(len(images)):
             i2 = i + 1 if i + 1 < len(images) else 0
             print
-            print 'Calculating epipolar lines', images[i], 'and', images[i2]
+            print 'Calculating point view matrix entries for', images[i], 'and', images[i2]
             print '=' * 80
 
             img1 = cv2.imread(dirname + '/' + images[i])[:, :, ::-1]
@@ -216,7 +220,7 @@ def generate_point_view_matrix(dirname, use_cache=True):
 
                     for fp, p in enumerate(
                             zip(point_view_matrix.loc['img%d_x' % i], point_view_matrix.loc['img%d_y' % i])):
-                        if (point1[0], point1[1]) == p:
+                        if close_to(point1, p):
                             point_view_matrix.ix['img%d_x' % i2, fp] = point2[0]
                             point_view_matrix.ix['img%d_y' % i2, fp] = point2[1]
                             break
@@ -263,11 +267,11 @@ def get_dense_submatrix(pv_matrix):
     overlapping_columns = (~np.isnan(rel_part)).all(axis=0)
     if not overlapping_columns.shape[0] >= 3:
         return get_dense_submatrix(pv_matrix[:,1])
+    
 
     #Change PVM to not overlap and dense submatrix to do overlap
     pvm = pv_matrix[:, ~overlapping_columns]
     dense = rel_part[:, overlapping_columns]
-    
     return dense, pvm
 
 def eliminate_ambiguity(motion, structure):
@@ -293,8 +297,9 @@ def structure_motion_from_PVM(PVM):
     PVM = move_to_mean(PVM)
 
     structures = []
+    
 
-    while PVM.shape[0] > 3:
+    while PVM.shape[1] > 3:
         dense, PVM = get_dense_submatrix(PVM)
         if not dense.shape[0] > 3:
             continue
@@ -308,7 +313,8 @@ def structure_motion_from_PVM(PVM):
         structure = np.dot(S3, V3)
 
         if structure.shape[0] < 3:
-            break
+            continue
+        
 
         motion, structure = eliminate_ambiguity(motion, structure)
         
@@ -322,23 +328,29 @@ def structure_motion_from_PVM(PVM):
     #fig = plt.figure()
     #ax = fig.gca(projection='3d')
     #ax.scatter(structures[0].T[:,0], structures[0].T[:,1], structures[0].T[:,2], color='b')
+    
+    base_structure = structures[0]
 
 
-
-    for i, structure in enumerate(structures[:-2]):
+    for i, structure in enumerate(structures[1:]):
         print i+1,' out of', len(structures), '\r',
         sys.stdout.flush()
-        R, t, distance = ICP(structures[i+1], structure)
+        R, t, distance = ICP(structure, base_structure)
 
-        new_structure = (np.dot(structures[i+1].T, R) + t).T
+        new_structure = (np.dot(structure.T, R) + t).T
 
         fig = plt.figure()
         ax = fig.gca(projection='3d')
-        ax.scatter(structure.T[:,0], structure.T[:,1], structure.T[:,2], color='b')
+        ax.scatter(base_structure.T[:,0], base_structure.T[:,1], base_structure.T[:,2], color='b')
         ax.scatter(new_structure.T[:,0], new_structure.T[:,1], new_structure.T[:,2], color='g')
         plt.show()
 
+        #base_structure = np.hstack((base_structure, new_structure))
+        base_structure = structure
 
+
+def filterPVM(PVM):
+    return PVM[:, (~np.isnan(PVM)).astype(bool).sum(0) >= 6]
 
         
 
@@ -346,6 +358,7 @@ def structure_motion_from_PVM(PVM):
 
 if __name__ == "__main__":
     PVM = generate_point_view_matrix(sys.argv[1])
-    #plt.matshow(PVM, interpolation='nearest', cmap='Greys')
-    #plt.show()
+    PVM = filterPVM(PVM)
+    plt.matshow(PVM, interpolation='nearest', cmap='Greys')
+    plt.show()
     structure_motion_from_PVM(PVM)
