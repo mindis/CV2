@@ -292,8 +292,8 @@ if __name__ == '__main__':
     matches = filter_matches(matches)
     print "Filtered Match Count:\t", len(matches)
 
-    # plt.imshow(drawMatches(img1, kp1, img2, kp2, matches))
-    # plt.show()
+    plt.imshow(drawMatches(img1, kp1, img2, kp2, matches))
+    plt.show()
 
     H, status = homography_ransac(matches, 500, kp1, kp2)
     print "Number of inliers:\t", status
