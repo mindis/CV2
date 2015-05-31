@@ -62,7 +62,7 @@ def drawMatches(img1, kp1, img2, kp2, matches):
     # cv2.destroyAllWindows()
 
 
-def filter_matches(matches, ratio=0.75, sort=False):
+def filter_matches(matches, ratio=0.5, sort=False):
     '''
     reduce weird random matches
     :param matches:

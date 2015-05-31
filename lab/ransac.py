@@ -12,7 +12,7 @@ def get_error(error_function, model, test_points):
 # lo-ransac
 # todo: add converge detection
 def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
-           t=5, acceptance=0.25, verbose=True,
+           t=1, acceptance=0.25, verbose=True,
            additional_args=None):
     # modified to reflect http://en.wikipedia.org/w/index.php?title=RANSAC&oldid=116358182
 
@@ -36,9 +36,10 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
         inlier_idx = np.where(test_err < t)[0]   # select indices of rows with accepted points
 
         # Check model acceptance
-        if len(inlier_idx) > acceptance * len(sample_pop):
+        if len(inlier_idx) > (acceptance * len(sample_pop)):
             better_data = sample_pop[inlier_idx]
-            bettermodel = algorithm(better_data, **additional_args)
+            better_test_idx = np.random.choice(len(better_data), size=n_samples)
+            bettermodel = algorithm(better_data[better_test_idx], **additional_args)
             better_errs = get_error(error_function, bettermodel, better_data)
             better_inliers_idx = np.where(better_errs < t)[0]
 
@@ -50,12 +51,5 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
                 if verbose:
                     print 'iteration %d - best inlier %d' % (i, besterr)
 
-                # reset counter
-                converge_counter = 0
-
-        converge_counter += 1
-        if converge_counter > 1000:
-            print "converged.."
-            break
 
     return bestfit, best_sample
