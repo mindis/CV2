@@ -12,7 +12,7 @@ def get_error(error_function, model, test_points):
 # lo-ransac
 # todo: add converge detection
 def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
-           t=5, acceptance=0.25, verbose=True,
+           t=1e-4, acceptance=0.25, verbose=True,
            additional_args=None):
     # modified to reflect http://en.wikipedia.org/w/index.php?title=RANSAC&oldid=116358182
 

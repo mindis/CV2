@@ -62,22 +62,19 @@ def normalized_eight_point(points, T1, T2):
     F = np.dot(np.array(T1).T, np.dot(F, np.array(T2)))
     return F / F[2, 2]
 
-
 def sampson_distance(points, F):
     coords1, coords2 = points
-    coords1 = [coords1[0], coords1[1], 1]
-    coords2 = [coords2[0], coords2[1], 1]
-
-    num = np.dot(np.array(coords2).T, np.dot(F, np.array(coords1))) ** 2
+    coords1 = np.array([coords1[0], coords1[1], 1])
+    coords2 = np.array([coords2[0], coords2[1], 1])
+    
+    num = np.dot(coords2.T, np.dot(F, coords1)) ** 2
     Fp1 = np.dot(F, coords1)
     Fp2 = np.dot(F, coords2)
-    denum = (Fp1[0] ** 2) + (Fp1[1] ** 2) + (Fp2[0] ** 2) + (Fp2[1] ** 2)
-    return num / denum
-
+    denom = (Fp1 ** 2).sum() + (Fp2 ** 2).sum()
+    return num / denom
 
 def blur_image(img, gaussian_size=(3, 3)):
     return cv2.GaussianBlur(cv2.cvtColor(img, cv2.COLOR_RGB2GRAY), gaussian_size, 0)
-
 
 def plot_epipolar_line(im, F, x, color='r'):
     """ 
@@ -328,7 +325,7 @@ def structure_motion_from_PVM(PVM):
         fig = plt.figure()
         ax = fig.gca(projection='3d')
         ax.scatter(structure[0], structure[1], structure[2])
-        plt.savefig('img/%z3d.png' % len(structures))
+        plt.savefig('img/%d.png' % len(structures))
 
         structures.append(structure)
     
