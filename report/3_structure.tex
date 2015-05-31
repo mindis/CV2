@@ -36,3 +36,13 @@ The factorization method that we have chosen to use is to extract dense subblock
 	\label{fig:pvm}
 \end{figure}
 
+We have also eliminated the affine ambiguity by using a system of equations from the motion matrix and the Cholesky composition. This should improve the performance of our system.
+
+In Figure~\ref{fig:points} the results of this part of the system are seen. The first image clearly shows the structure of the teddy bear. However other 3D points clouds are less clear about what they represent.
+
+\begin{figure}[ht]
+	\subfloat[The first dense block of the PVM]{\includegraphics[width=.4\textwidth]{bear_points1}} \quad
+	\subfloat[The second dense block of the PVM]{\includegraphics[width=.4\textwidth]{bear_points2}}
+	\caption{The results of the Structure from Motion after the elimination of affine ambiguity. Left clearly shows the bear. Other results, like the right one are less clear.}
+	\label{fig:points}
+\end{figure}

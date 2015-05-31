@@ -201,9 +201,9 @@ def generate_point_view_matrix(dirname, use_cache=True):
             img1 = cv2.imread(join(dirname, images[i]))[350:1250, 700:1650, ::-1]
             img2 = cv2.imread(join(dirname, images[i2]))[350:1250, 700:1650, ::-1]
 
-            F, inliers = get_fundamental_matrix(img1, img2, filter_match=.75, n_iter=5000, acceptance=0.01)
+            F, inliers = get_fundamental_matrix(img1, img2, filter_match=.75, n_iter=1000, acceptance=0.01)
             
-            draw_epipolar_lines(img1, img2, F, inliers)
+            #draw_epipolar_lines(img1, img2, F, inliers)
 
             if point_view_matrix.shape[1] == 0:
                 for iix, (point1, point2) in enumerate(inliers):
@@ -305,7 +305,7 @@ def structure_motion_from_PVM(PVM):
 
     while PVM.shape[1] > 3:
         dense, PVM = get_dense_submatrix(PVM)
-        if not dense.shape[0] > 3:
+        if not (dense.shape[0] > 3 and dense.shape[1] >= 100):
             continue
 
         U, s, V = np.linalg.svd(dense)
@@ -326,7 +326,7 @@ def structure_motion_from_PVM(PVM):
         ax = fig.gca(projection='3d')
         ax.scatter(structure[0], structure[1], structure[2])
         plt.savefig('img/%d.png' % len(structures))
-
+        plt.show()
         structures.append(structure)
     
     #fig = plt.figure()
@@ -369,7 +369,7 @@ if __name__ == "__main__":
     if dirname.endswith('/'):
         dirname = dirname[:-1]
     PVM = generate_point_view_matrix(dirname)
-    PVM = filterPVM(PVM)
+    #PVM = filterPVM(PVM)
     plt.matshow(~np.isnan(PVM).astype(bool), cmap='Greys')
     plt.show()
     structure_motion_from_PVM(PVM)
