@@ -1,10 +1,26 @@
 \section{Keypoint extraction and matching}
 \label{matching}
-The first step in making a 3D reconstruction is to extract feature points from the two images. \fixme{Elaborate matching, why, what are feature points, example of two teddybear with matches.}
-In this report we will use the SIFT feature descriptors, introduced by Lowe\cite{SIFT} in 2004, as it has been the defacto representation method for feature points for the last years.\fixme{Elaborate SIFT}
+The first step in making a 3D reconstruction is to extract feature points from the two images. 
+Feature points is a set of points that when together will be unique enough for representing an image.
+A good feature points extracted from a descriptors should be repeatable, unique and consistent for all images; occupies a relatively small area of the image (for robust to clutter and occlusion); and has a compact representation.
+In this report we will use the SIFT feature descriptors, introduced by Lowe\cite{SIFT} in 2004, as it has been the de facto representation method for feature points for the past years.
+
+SIFT can robustly identify objects even among clutter and under partial occlusion, because it is invariant to uniform scaling, orientation, and partially invariant to illumination changes and affine distorting up to 60 degrees out of plane rotation.
+Keypoints SIFT detect the unique corners in the image, therefore we need to have a source image with enough texture in order to have enough number of feature points.
+
 We use a brute force matcher to match SIFT descriptors between images. 
 For every keypoint in the first image we will find the keypoints with the smallest and the next-to-smallest euclidian distance in the second image. 
-To filter out ambigous matches we applied a ratio test. If the distance of the best match was bigger then a ratio of the second-to-best match then the keypoints were discarded. \fixme{Example of ratio test reduction of matches?}
+To filter out ambiguous matches we applied a ratio test. 
+If the distance of the best match was bigger then a ratio of the second-to-best match then the keypoints were discarded.
+By doing this ratio test reduction, we can remove keypoints that are not relevant for matching.
+We found out that ratio 0.75 is enough for our experiment.
+We also found out that by blurring the image with gaussian blur before extracting the feature can make the SIFT descriptor robust to background noise.
+
+After we have a good set of feature points representation, we can then estimate a homography matrix using RANSAC \cite{RANSAC}. 
+In this report we implemented the improved version of RANSAC, namely Locally Optimized RANSAC (LO-RANSAC) \cite{LORANSAC}.
+For the matching model, we used projection transformation matrix to make it robust to the images that were taken from different angles and distances.
+
+\fixme{add general pipeline}
 
 \begin{figure}[!ht]
 	\centering
@@ -16,4 +32,8 @@ To filter out ambigous matches we applied a ratio test. If the distance of the b
 	\label{fig:bus}
 \end{figure}
 
-An example of the matching is seen in Figure~\ref{fig:bus}. Here we used SIFT matching, the bruteforce matcher and the ratio test to get the red matches in Figure~\ref{fig:bus}a.  They can be used to find a transform that will have the last images as the result if the image are combined after transforming.
+To test the correctness of our RANSAC implementation, we transform both images using homography matrix and then draw the matched line.
+With this evaluation, we can estimate an optimal number of iterations needed to compute a good homography.
+We found out that with LORANSAC, 50 iterations is enough while with standard RANSAC we need at least 500 iterations to find a good estimation of homography 
+
+An example of the matching is seen in Figure~\ref{fig:bus}. Here we used SIFT matching, the brute force matcher and the ratio test to get the red matches in Figure~\ref{fig:bus}a.  They can be used to find a transform that will have the last images as the result if the image are combined after transforming.
