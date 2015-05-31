@@ -1,6 +1,7 @@
 \section{Structure from Motion}
 \label{structure}
-In this section we will explain how we used Structure from Motion\cite{SfM} to create a set of 3D point clouds representing the teddy bear shown in Figure~\ref{fig:bear}.
+In this section we will explain how we used Structure from Motion\cite{SfM} to create a set of 3D point clouds
+representing the teddy bear shown in Figure~\ref{fig:bear}.
 Using RANSAC\cite{ransac} in combination with the eight-point algorithm\cite{eightpoint} and the Sampson distance we can get the fundamental matrix.
 Instead of RANSAC we have used an improved version of RANSAC called LO-RANSAC, a Locally Optimized version of RANSAC.
 This version adds an improvement step to the results of every RANSAC-iteration. If the amount of inliers of the iteration is above a certain ratio of the population this step is started.
@@ -29,6 +30,7 @@ With the results of this SVD we can create two matrices, the motion- and structu
 However as we can see in Figure~\ref{fig:pvm} not every point is seen in every image.
 To deal with this we need to use a factorization method to still use Singular Value Decomposition to create a 3D point cloud that represents the teddy bear.
 The factorization method that we have chosen to use is to extract dense subblocks from this point view matrix  and create multiple motion- and structure-matrices and stitch them together afterwards.
+
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{pvm}
