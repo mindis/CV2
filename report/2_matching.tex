@@ -1,6 +1,5 @@
 \section{Keypoint extraction and matching}
 \label{matching}
-<<<<<<< HEAD
 The first step in making a 3D reconstruction is to extract feature points from the two images.
 Feature points are points of interest in an image and there are multiple ways of extracting them from an image.
 A good feature points extracted from a descriptors should be repeatable, unique and consistent for all images;
@@ -37,10 +36,6 @@ In this report we implemented the improved version of RANSAC, namely Locally Opt
 For the matching model, we used projection transformation matrix to make it robust to the images that were taken from different angles and distances.
 We use this projection transformation because we assume that the camera point is not changed, therefore there is a homography between two views.
 
-We found after some experiments that this value however does not work as well for teddy bear data (seen in Figure~\ref{fig:bear} set that we will try to reconstruct,
-too many points get removed to still be able to reconstruct the teddy bear,
-so we decided to have a ratio of $.75$ there.
-
 \begin{figure}[ht]
 	\centering
 	\includegraphics[width=.45\textwidth]{teddybear}
@@ -48,18 +43,18 @@ so we decided to have a ratio of $.75$ there.
 	\label{fig:bear}
 \end{figure}
 
-To test the correctness of our RANSAC implementation, we transform both images using homography matrix and then draw the matched line.
+To test the correctness of our RANSAC implementation, we transform one of the two images using homography matrix and then draw the matched line.
 With this evaluation, we can estimate an optimal number of iterations needed to compute a good homography.
-We found out that with LORANSAC, 50 iterations is enough while with standard RANSAC we need at least 500 iterations to find a good estimation of homography
-We also found out that by blurring the image with gaussian blur before extracting the feature can make the SIFT descriptor robust to background noise.
 
-\fixme{add general pipeline}
-
-To test the correctness of our RANSAC implementation, we transform one of the images using homography matrix and then draw the matched line.
-With this evaluation, we can estimate an optimal number of iterations needed to compute a good homography.
-We found out that with LORANSAC, 50 iterations is enough while with standard RANSAC we need at least 500 iterations to find a good estimation of homography 
+\fixme{add general pipeline picture}
 
 An example of the matching is seen in Figure~\ref{fig:bus}. 
 Here we used SIFT matching, the brute force matcher and the ratio test to get the red matches in Figure~\ref{fig:bus}a. 
 They can be used to find a transform that will have the last images as the result if the image are combined after transforming.
 The ratio test trimmed down the matches from 1419 matches to only 200 relevant ones, for a ratio of $.5$.
+We found after some experiments that this value however does not work as well for teddy bear data (seen in Figure~\ref{fig:bear} set that we will try to reconstruct,
+too many points get removed to still be able to reconstruct the teddy bear,
+so we decided to have a ratio of $.75$ there.
+Implementation of LO-RANSAC greatly reduce the calculation time.
+With LO-RANSAC, 50 iterations is enough while with standard RANSAC we need at least 500 iterations to find a good estimation of homography
+We also found out that by blurring the image with gaussian blur before extracting the feature can make the SIFT descriptor robust to background noise.
