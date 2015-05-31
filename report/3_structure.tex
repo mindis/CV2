@@ -1,16 +1,22 @@
 \section{Structure from Motion}
 \label{structure}
-In this section we will explain how we used Structure from Motion \cite{SfM} to create a set of 3D point clouds
+
+Different than the previous section, in this section we are not using the single point camera assumption.
+Without this assumption, we cannot affirm that there is a projective transformation (homography) between two views.
+In this section we will explain how we used Structure from Motion\cite{SfM} to create a set of 3D point clouds
 representing the teddy bear shown in Figure~\ref{fig:bear}.
-Using RANSAC \cite{RANSAC} in combination with the eight-point algorithm \cite{eightpoint} and the Sampson distance we can get the fundamental matrix.
-Instead of RANSAC we have used an improved version of RANSAC called LO-RANSAC, a Locally Optimized version of RANSAC.
-This version adds an improvement step to the results of every RANSAC-iteration. If the amount of inliers of the iteration is above a certain ratio of the population this step is started.
+
+Using LO-RANSAC\cite{ransac} in combination with the eight-point algorithm\cite{eightpoint} and the Sampson distance, we can estimate the fundamental matrix.
+LO-RANSAC adds an improvement step to the results of every RANSAC-iteration.
+If the amount of inliers of the iteration is above a certain ratio of the population this step is started.
 In this improvement-step the inliers of the RANSAC-iteration are used as the population from which the actual model, the fundamental matrix, is then calculated.
 
 The eight-point algorithm derives the fundamental matrix with a sample of eight points.
 We have used the normalized version that is better suited to derive the fundamental matrix.
 This version transforms the points in such a way that the points have a mean distance of $\sqrt{2}$.
-The fundamental matrix is a relationship between any two images of the same scene that constrains where the projection of points from the scene can occur in both images.
+
+The fundamental matrix is a relationship between any two images of the same scene that constrains
+where the projection of points from the scene can occur in both images.
 These constraints are called the epipolar constraints.
 An example of this can be seen in Figure~\ref{fig:epipolar}.
 Here we see the lines that constrain the location of the points in the other image.
