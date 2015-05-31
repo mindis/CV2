@@ -31,7 +31,7 @@ However as we can see in Figure~\ref{fig:pvm} not every point is seen in every i
 To deal with this we need to use a factorization method to still use Singular Value Decomposition to create a 3D point cloud that represents the teddy bear.
 The factorization method that we have chosen to use is to extract dense subblocks from this point view matrix  and create multiple motion- and structure-matrices and stitch them together afterwards.
 
-\begin{figuire}[ht]
+\begin{figure}[ht]
 	\centering
 	\includegraphics[width=\textwidth]{pvm}
 	\caption{The point view matrix of the teddy bear. Black entries represent a value, whereas a white represents a point that is not seen in that image.}
