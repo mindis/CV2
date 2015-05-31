@@ -172,7 +172,7 @@ def draw_epipolar_line(img1, img2, F, best_sample):
 
     plt.show()
 
-def close_to(point1, point2, treshold=2):
+def close_to(point1, point2, treshold=10):
     x1, y1 = point1
     x2, y2 = point2
     return x1-treshold <= x2 <= x1+treshold and y1-treshold <= y2 <= y1+treshold
@@ -339,18 +339,19 @@ def structure_motion_from_PVM(PVM):
 
         new_structure = (np.dot(structure.T, R) + t).T
 
-        fig = plt.figure()
-        ax = fig.gca(projection='3d')
-        ax.scatter(base_structure.T[:,0], base_structure.T[:,1], base_structure.T[:,2], color='b')
-        ax.scatter(new_structure.T[:,0], new_structure.T[:,1], new_structure.T[:,2], color='g')
-        plt.show()
+        
+        base_structure = np.hstack((base_structure, structure))
+        #base_structure = structure
+    fig = plt.figure()
+    ax = fig.gca(projection='3d')
+    ax.scatter(base_structure.T[:,0], base_structure.T[:,1], base_structure.T[:,2], color='b')
+    #ax.scatter(new_structure.T[:,0], new_structure.T[:,1], new_structure.T[:,2], color='g')
+    plt.show()
 
-        #base_structure = np.hstack((base_structure, new_structure))
-        base_structure = structure
 
 
 def filterPVM(PVM):
-    return PVM[:, (~np.isnan(PVM)).astype(bool).sum(0) >= 6]
+    return PVM[:, (~np.isnan(PVM)).astype(bool).sum(0) >= 8]
 
         
 
@@ -359,6 +360,6 @@ def filterPVM(PVM):
 if __name__ == "__main__":
     PVM = generate_point_view_matrix(sys.argv[1])
     PVM = filterPVM(PVM)
-    plt.matshow(PVM, interpolation='nearest', cmap='Greys')
+    plt.matshow(~np.isnan(PVM).astype(bool), cmap='Greys')
     plt.show()
     structure_motion_from_PVM(PVM)

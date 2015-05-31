@@ -54,7 +54,7 @@ def ransac(sample_pop, algorithm, error_function, n_samples=8, n_iter=5000,
                 converge_counter = 0
 
         converge_counter += 1
-        if converge_counter > 15:
+        if converge_counter > 25:
             print "converged.."
             break
 
